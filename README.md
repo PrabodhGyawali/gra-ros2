@@ -1,9 +1,36 @@
 # Prerequisites
 This package is intended for ROS 2 Jazzy. Follow the [installation guide](https://docs.ros.org/en/jazzy/Installation.html)
 
-Make sure to install `ros-jazzy-desktop`, and make sure RViz2 is installed.
+Or simply paste the code below to speed things up:
+```
+locale  # check for UTF-8
 
+sudo apt update && sudo apt install locales
+sudo locale-gen en_US en_US.UTF-8
+sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+export LANG=en_US.UTF-8
+
+sudo apt install software-properties-common
+sudo add-apt-repository universe
+
+sudo apt update && sudo apt install curl -y
+sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+
+sudo apt update
+
+sudo apt upgrade
+```
+
+Make sure to install `ros-jazzy-desktop`, and make sure RViz2 is installed.
+```
+sudo apt install ros-jazzy-desktop
+```
 Install [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/install_ubuntu/), then proceed.
+```
+sudo apt-get install ros-jazzy-ros-gz
+```
 
 # Build Instructions
 
@@ -23,11 +50,15 @@ Clone the repository into the source directory
 git clone https://github.com/GryphonRacingAI/gra-ros2.git
 ```
 
+If `rosdep` is not installed run this: `sudo apt-get install python3-rosdep`
+
 Resolve dependencies
 ```bash
 cd ~/colcon_ws
 rosdep install -i --from-path src --rosdistro jazzy -y
 ```
+
+If `colcon` is not installed run this: `sudo apt install colcon`
 
 Then build and source the workspace
 ```bash
