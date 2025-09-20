@@ -33,7 +33,7 @@ class PredictNode(Node):
     def __init__(self):
         super().__init__("predict_node")
         self.declare_parameter("yolo_model", "yolov8n.pt")
-        self.declare_parameter("input_topic", "image_raw")
+        self.declare_parameter("input_topic", "/zed/zed_node/left/image_rect_color")
         self.declare_parameter("result_topic", "yolo_result")
         self.declare_parameter("result_image_topic", "yolo_image")
         self.declare_parameter("conf_thres", 0.25)
