@@ -2,7 +2,7 @@
 
 
 
-## ROS Jazzy Apptainer Setup 
+## ROS Apptainer Setup 
 Follow each bullet point in steps below.
 >1. Open the terminal app in uni cluster (press Windows Key <kbd>⊞</kbd> and search for `terminal`). 
 
@@ -16,8 +16,8 @@ cd ~/colcon_ws/src/apptainer
 ```
 >2. Run the build script to get container environment with dependencies and ros2 jazzy environment.
 ```bash
-chmod u+x setup_apptainer.sh
-. ./setup_apptainer.sh
+chmod u+x setup.sh
+./setup.sh
 ```
 
 This automaticallys builds the container images and places in `/local/data/$USER` in 15 minutes
@@ -48,6 +48,8 @@ Make sure you are not inside apptainer
 ```bash
 echo "alias fsai='apptainer shell --nv /local/data/\$USER/ros_jazzy.sif'" >> ~/.bashrc
 ```
+
+>6. If you want to rerun `step 2` for a new environment, I recommend using another folder inside `/local/data/$USER/` eg: `/local/data/$USER/humble` for humble environment and `/local/data/$USER/jazzy` for jazzy environment. Do make sure to delete existing: ``/local/data/$USER/<your-env-name>` in case of conflicting files if you want to rerun the `setup.sh` script smoothly without errors.
 
 Now running: `fsai` should allow you to enter your apptainer container 
 ## Creating your Custom Apptainer Container with extra dependencies
@@ -95,7 +97,14 @@ Turning on the computer may take a few minutes, then you can `ssh` into it.
 ## Troubleshooting
 **Disk Quota Limit Exceeded**:
 
-You shouldn't get this if you have used `/local/data/$USER` if you do let Technical Director know.
+#### Clear Cache
+Most common culprit is the apptainer cache.
+
+```bash
+apptainer cache clean
+```
+
+If this still doesn't work make sure you are using `/local/data/$USER` if you do let Technical Director know.
 - run `quota` to check your disk quota
 - run `du -sh * | sort -h` at `~` to see where disk space is being used
 - carefully use `rm` to free up space, be sure to backup or important files (eg git commits)
@@ -105,3 +114,5 @@ Note: the `ros_jazzy.sif` file should only take up: 12 GB of space.
 
 - This is why we are using the shared disk space in `/local/data` not the NFS shared across university networks, which has ~15 GB quota per student.
 
+#### Re-running the `setup.sh` script not working
+Make sure you have read `step 6` [above](#ros-apptainer-setup)

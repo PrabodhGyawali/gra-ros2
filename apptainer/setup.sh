@@ -1,38 +1,41 @@
-#!bin/bash
-
+#!/bin/bash
 # University Red Hat apptainer container setup in: '/local/data/$USER'
+# Usage: ./setup_container.sh [OPTIONS]
+# See './setup_container.sh --help' for details.
 
-# Paste below into a shell
-
+# Default values
 SETUP_DIR="/local/data/$USER"
 INSTALL_ZED="no"
 ROS_DISTRO="jazzy"
 
+# Function to display help message
 show_help() {
     echo "Usage: $0 [OPTIONS]"
-    echo "Set up an Apptainer container environment for ROS Jazzy and related dependencies."
+    echo "Set up an Apptainer container environment for ROS Jazzy or Humble and related dependencies."
     echo
     echo "Options:"
     echo "  -z, --zed        Enable ZED SDK installation (default: disabled)"
+    echo "  -r, --ros-distro DISTRO  Specify ROS distribution: jazzy or humble (default: jazzy), (humble is for IPG Carmaker)"
     echo "  -d, --dir DIR    Specify setup directory (default: /local/data/$USER)"
     echo "  -h, --help       Display this help message and exit"
     echo
     echo "Example:"
-    echo "  $0 --zed --dir /custom/path"
-    echo "  $0 -z -d /custom/path"
+    echo "  $0 --zed --ros-distro humble --dir /custom/path"
+    echo "  $0 -z -r humble -d /custom/path"
     exit 0
 }
 
-while [[ "$#" -gt 0 ]]; do 
-    case $1 in 
+# Parse command-line options
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
         -z|--zed) INSTALL_ZED="yes" ;;
         -r|--ros-distro) ROS_DISTRO="$2"; shift ;;
-        -d|--dir) SETUP_DIR="$2" ; shift ;;
+        -d|--dir) SETUP_DIR="$2"; shift ;;
         -h|--help) show_help ;;
         *) echo "Unknown option: $1"; show_help ;;
     esac
     shift
-done 
+done
 
 # Validate ROS distro
 if [[ "$ROS_DISTRO" != "jazzy" && "$ROS_DISTRO" != "humble" ]]; then
@@ -62,6 +65,7 @@ zed_file="ZED_SDK_Ubuntu${ubuntu_codename}_cuda12.8_tensorrt10.9_v5.0.5.zstd.run
 zed_url="https://download.stereolabs.com/zedsdk/5.0/cu12/ubuntu${ubuntu_codename}"
 cuda_keyring_url="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${ubuntu_repo}/x86_64/cuda-keyring_1.1-1_all.deb"
 
+# Ensure SETUP_DIR is absolute
 SETUP_DIR=$(realpath -m "$SETUP_DIR")
 
 echo "Setting up $SETUP_DIR for user $USER with ROS $ROS_DISTRO"
@@ -69,17 +73,17 @@ mkdir -p "$SETUP_DIR"
 cd "$SETUP_DIR"
 echo "Generating ros_${ros_distro_lower}.def for $ROS_DISTRO..."
 
-# Dynamic definition file generation
+# Generate the definition file dynamically
 cat > "ros_${ros_distro_lower}.def" << EOF
 Bootstrap: docker
 From: ${base_image}
 %files
-    /local/data/<username>/ros_gz_bridge.py /local/data/<username>/ros_gz_bridge.py
-$( [[ "$INSTALL_ZED" == "yes" ]] && echo "    /local/data/<username>/${zed_file} /local/data/<username>/${zed_file}" )
-    cuda-keyring_1.1-1_all.deb /local/data/<username>/cuda-keyring_1.1-1_all.deb
-    /local/data/<username>/colcon_ws/src /local/data/<username>/colcon_ws/src
+    ros_gz_bridge.py ${SETUP_DIR}/ros_gz_bridge.py
+$( [[ "$INSTALL_ZED" == "yes" ]] && echo "    cuda-keyring_1.1-1_all.deb ${SETUP_DIR}/cuda-keyring_1.1-1_all.deb" )
+$( [[ "$INSTALL_ZED" == "yes" ]] && echo "    ${zed_file} ${SETUP_DIR}/${zed_file}" )
+    colcon_ws/src ${SETUP_DIR}/colcon_ws/src
 
-    %post
+%post
     # Simulation 
     apt-get -y update
     apt-get -y install vim
@@ -92,9 +96,7 @@ $( [[ "$INSTALL_ZED" == "yes" ]] && echo "    /local/data/<username>/${zed_file}
     apt-get install -y libvulkan1 vulkan-tools
     apt-get install -y mesa-vulkan-drivers
     apt-get install -y ros-${ros_distro_lower}-ackermann-msgs
- 
-    cp /local/data/<username>/ros_gz_bridge.py /opt/ros/${ROS_DISTRO}/lib/python${python_ver}/site-packages/ros_gz_bridge/actions/ros_gz_bridge.py
- 
+  
  
     curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
     echo "deb [arch=\$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable \$(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
@@ -104,31 +106,33 @@ $( [[ "$INSTALL_ZED" == "yes" ]] && echo "    /local/data/<username>/${zed_file}
     apt-get install -y python3-colcon-common-extensions
     apt-get install -y python3-rosdep
     rosdep update
-
 $( [[ "$INSTALL_ZED" == "yes" ]] && echo "
     # Bringup setup
     ## Install Zed 2i packages
  
     ### Cuda 12.8
-    dpkg -i /local/data/<username>/cuda-keyring_1.1-1_all.deb
+    dpkg -i ${SETUP_DIR}/cuda-keyring_1.1-1_all.deb
     apt-get -y update
     apt-get -y install cuda-toolkit-12-8
     ### 1. ZDK Install
     apt-get install -y zstd
-    apt-get install -y libjpeg-turbo8-dev libturbojpeg
-
-    cd /local/data/<username>
+    apt-get install -y libjpeg-turbo8-dev libturbojpeg  # ZDK dependency
+ 
+    cd ${SETUP_DIR}
     chmod +x ${zed_file}
-    ./${zed_file} --silent
+    ./${zed_file} --silent " )
+    ### 2. Install VLP-16
+    apt-get install -y ros-${ros_distro_lower}-velodyne 
 
-### 2. Install VLP-16
-    apt-get install -y ros-${ros_distro_lower}-velodyne
+    ls /opt/ros/${ROS_DISTRO}/lib/python${python_ver}/site-packages
+    cp ${SETUP_DIR}/ros_gz_bridge.py /opt/ros/${ROS_DISTRO}/lib/python${python_ver}/site-packages/ros_gz_bridge/actions/ros_gz_bridge.py
+
  
     ## Build the zed_ros2_wrapper colcon packages
-    cd /local/data/<username>/colcon_ws/src  # THIS MUST BE PRESENT BEFOREHAND
+    cd ${SETUP_DIR}/colcon_ws/src  # THIS MUST BE PRESENT BEFOREHAND
     cd ..
     rosdep update
-    rosdep install --from-path src --ignore-src -r -y # install dependencies" )
+    rosdep install --from-path src --ignore-src -r -y # install dependencies
 
 %environment
     # Inherit and ensure base environment is sourced
@@ -146,9 +150,6 @@ $( [[ "$INSTALL_ZED" == "yes" ]] && echo "
    Prabodh Gyawali
 EOF
 
-# Replace placeholders in def file
-sed -i "s|<username>|${USER}|g" "ros_${ros_distro_lower}.def"
-
 # Download ros_gz_bridge.py
 echo "Downloading ros_gz_bridge.py..."
 wget -O ros_gz_bridge.py "https://raw.githubusercontent.com/gazebosim/ros_gz/0abd2b217d92ae7f65c1fa9f2a6464072217a038/ros_gz_bridge/ros_gz_bridge/actions/ros_gz_bridge.py"
@@ -162,10 +163,11 @@ if [[ "$INSTALL_ZED" == "yes" ]]; then
     wget --continue -O "${zed_file}" "${zed_url}"
 fi
 
-# zed_ros2_wrapper setup if ZED is enabled
+# Setup colcon workspace
+echo "Setting up colcon workspace..."
+mkdir -p colcon_ws/src
 if [[ "$INSTALL_ZED" == "yes" ]]; then
-    echo "Setting up colcon workspace and cloning zed_ros2_wrapper..."
-    mkdir -p colcon_ws/src
+    echo "Cloning zed_ros2_wrapper..."
     cd colcon_ws/src
     git clone https://github.com/stereolabs/zed-ros2-wrapper.git
     cd "$SETUP_DIR"
@@ -183,7 +185,7 @@ From: $SETUP_DIR/ros_${ros_distro_lower}.sif
     # Add your custom installations, package builds, or commands here.
 %environment
     # Inherit and ensure base environment is sourced
-    export GZ_SIM_RESOURCE_PATH=/uolstore/home/users/$USER/colcon_ws/install/simulation/share/
+    export GZ_SIM_RESOURCE_PATH=/uolstore/home/users/\$USER/colcon_ws/install/simulation/share/
     source /opt/ros/${ROS_DISTRO}/setup.bash
 $( [[ "$INSTALL_ZED" == "yes" ]] && echo "
     # CUDA paths (if needed for your additions)
